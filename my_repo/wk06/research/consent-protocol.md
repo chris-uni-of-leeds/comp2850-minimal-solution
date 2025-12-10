@@ -1,4 +1,4 @@
-# Informed Consent Protocol — Week 6 Peer Interviews
+# Informed Consent Protocol 
 
 **Module**: COMP2850 Human-Computer Interaction
 **Activity**: Low-risk needs-finding (peer interviews)
