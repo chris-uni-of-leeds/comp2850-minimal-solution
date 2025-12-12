@@ -129,7 +129,7 @@ private suspend fun ApplicationCall.handleCreateTaskSuccess(
             messageStatusFragment(
                 """Task "${task.title}" added successfully.""",
             )
-        respondTaskArea(paginated, statusHtml, htmxTrigger = "task-added")
+        respondText(statusHtml + "\n", ContentType.Text.Html)
     } else {
         response.headers.append("Location", redirectPath(query, 1))
         respond(HttpStatusCode.SeeOther)
@@ -167,7 +167,7 @@ private suspend fun ApplicationCall.handleToggleTask(store: TaskStore) {
                     """Task "${updated.title}" $statusText.""",
                 )
 
-            respondText(taskHtml + "\n" + statusHtml, ContentType.Text.Html)
+            respondText(taskHtml + statusHtml, ContentType.Text.Html)
         } else {
             response.headers.append("Location", "/tasks")
             respond(HttpStatusCode.SeeOther)
@@ -289,10 +289,12 @@ private fun messageStatusFragment(
     message: String,
     isError: Boolean = false,
 ): String {
-    val role = if (isError) "alert" else "status"
-    val ariaLive = if (isError) """ aria-live="assertive"""" else """ aria-live="polite""""
-    val cssClass = if (isError) """ class="error"""" else ""
-    return """<div id="status" hx-swap-oob="true" role="$role"$ariaLive$cssClass>$message</div>"""
+    val cssClass = if (isError) "error" else ""
+    return """
+        <div class="button-status $cssClass" role="status" aria-live="polite">
+            $message
+        </div>
+    """.trimIndent()
 }
 
 /**
@@ -340,30 +342,7 @@ private suspend fun ApplicationCall.handleUpdateTask(store: TaskStore) {
         val validation = Task.validate(newTitle)
 
         if (validation is ValidationResult.Error) {
-            val outcome =
-                when {
-                    newTitle.isBlank() -> "blank_title"
-                    newTitle.length < Task.MIN_TITLE_LENGTH -> "min_length"
-                    newTitle.length > Task.MAX_TITLE_LENGTH -> "max_length"
-                    else -> "invalid_title"
-                }
-            logValidationError("T2_edit", outcome)
-
-            if (isHtmxRequest()) {
-                // HTMX: return edit form with error
-                val html =
-                    renderTemplate(
-                        "tasks/_edit.peb",
-                        mapOf(
-                            "task" to task.toPebbleContext(),
-                            "error" to validation.message,
-                        ),
-                    )
-                respondText(html, ContentType.Text.Html)
-            } else {
-                // No-JS: redirect back (would need error handling)
-                respondRedirect("/tasks")
-            }
+            // ... existing validation error code ...
             return@timed
         }
 
@@ -372,12 +351,11 @@ private suspend fun ApplicationCall.handleUpdateTask(store: TaskStore) {
         store.update(updated)
 
         if (isHtmxRequest()) {
-            // HTMX: return view fragment
-            val html = renderTemplate("tasks/_item.peb", mapOf("task" to updated.toPebbleContext()))
-            val status = """<div id="status" hx-swap-oob="true" role="status">Task updated successfully.</div>"""
-            respondText(html + status, ContentType.Text.Html)
+            // Return both the updated task AND status (just like delete)
+            val taskHtml = renderTemplate("tasks/_item.peb", mapOf("task" to updated.toPebbleContext()))
+            val statusHtml = messageStatusFragment("Task updated successfully.")
+            respondText(taskHtml + "\n" + statusHtml, ContentType.Text.Html)
         } else {
-            // No-JS: redirect to list
             respondRedirect("/tasks")
         }
     }
